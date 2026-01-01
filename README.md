@@ -24,93 +24,111 @@ This tutorial covers a sophisticated multi-signature escrow smart contract (`Pub
 ### System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph "Off-Chain Components"
-        W1[Depositor<br/>Wallet 1]
-        W2[Beneficiary<br/>Wallet 2]
-        W3[Official 1<br/>Wallet 3]
-        W4[Official 2<br/>Wallet 4]
-        
-        subgraph "Endpoints"
-            EP1[lock]
-            EP2[approve]
-            EP3[release]
-            EP4[refund]
-        end
-        
-        subgraph "Emulator Trace"
-            ET[Test Execution Flow]
-        end
+flowchart TB
+    subgraph "User Layer"
+        A[Depositor]
+        B[Beneficiary]
+        C[Official 1]
+        D[Official 2]
     end
-    
-    subgraph "On-Chain Components"
-        SC[Smart Contract<br/>PublicFund.hs]
-        V[Validator Logic]
-        D[EscrowDatum]
-        A[EscrowAction]
+
+    subgraph "Interface Layer"
+        E[Web Interface]
+        F[Mobile App]
+        G[CLI Tools]
     end
-    
+
+    subgraph "Contract Layer"
+        H[Lock Endpoint]
+        I[Approve Endpoint]
+        J[Release Endpoint]
+        K[Refund Endpoint]
+        
+        L[Escrow Validator]
+        M((Smart<br/>Contract))
+        
+        N{Datum Storage}
+        O[Approval Tracker]
+    end
+
     subgraph "Blockchain Layer"
-        BC[Cardano Ledger]
-        UTXO[Script UTxO]
+        P[Cardano Node]
+        Q[Script UTxOs]
+        R[Ledger State]
     end
+
+    %% User connections
+    A --> H
+    B --> J
+    C --> I
+    D --> I
+
+    %% Interface connections
+    E --> H
+    E --> I
+    E --> J
+    E --> K
+    F --> H
+    F --> I
+    G --> H
+    G --> I
+
+    %% Contract internal connections
+    H --> L
+    I --> L
+    J --> L
+    K --> L
     
-    %% Connections
-    W1 --> EP1
-    EP1 --> SC
-    W3 --> EP2
-    W4 --> EP2
-    EP2 --> SC
-    W2 --> EP3
-    EP3 --> SC
-    W1 --> EP4
-    EP4 --> SC
-    
-    SC --> V
-    V --> D
-    V --> A
-    SC --> UTXO
-    UTXO --> BC
-    
-    ET -.-> EP1
-    ET -.-> EP2
-    ET -.-> EP3
-    ET -.-> EP4
+    L --> M
+    M --> N
+    M --> O
+
+    %% Blockchain connections
+    L --> P
+    P --> Q
+    Q --> R
+
+    %% Data flow
+    N -.->|State Updates| O
+    O -.->|Vote Counting| L
+    Q -.->|UTxO Reference| L
+
+    style M fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    style L fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    style P fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
 ```
 
 ### Workflow Sequence
 
 ```mermaid
-sequenceDiagram
-    participant D as Depositor (Wallet 1)
-    participant O1 as Official 1 (Wallet 3)
-    participant O2 as Official 2 (Wallet 4)
-    participant B as Beneficiary (Wallet 2)
-    participant SC as Smart Contract
-    participant BC as Blockchain
-    
-    Note over D,B: Phase 1: Fund Locking
-    D->>SC: lock() with 10 ADA
-    SC->>BC: Create UTxO with datum
-    
-    Note over D,B: Phase 2: Approvals (before deadline)
-    O1->>SC: approve()
-    SC->>BC: Update datum<br/>approvals: [O1]
-    
-    O2->>SC: approve()
-    SC->>BC: Update datum<br/>approvals: [O1, O2]
-    
-    Note over D,B: Phase 3: Release
-    B->>SC: release()
-    SC->>BC: Validate: 2 approvals ≥ required<br/>Validate: before deadline<br/>Validate: beneficiary signature
-    BC->>B: Transfer 10 ADA
-    
-    Note over D,B: Alternative: Refund Scenario
-    alt Insufficient approvals by deadline
-        D->>SC: refund()
-        SC->>BC: Validate: after deadline<br/>Validate: approvals < required<br/>Validate: depositor signature
-        BC->>D: Return 10 ADA
-    end
+timeline
+    title Multi-Signature Escrow Timeline
+    section Phase 1: Initialization
+        Day 0 : Depositor calls lock
+              : 10 ADA locked in contract
+              : Initial datum created
+    section Phase 2: Approval Period
+        Day 1-6 : Officials can approve
+               : Each approval updates datum
+               : Real-time status tracking
+    section Phase 3: Decision Point
+        Day 7 : Deadline reached
+             : Check total approvals
+             : Branch based on conditions
+    section Phase 4: Resolution
+        Case 1: Sufficient approvals
+            Day 8 : Beneficiary calls release
+                  : Funds transferred
+                  : Contract closed
+        Case 2: Insufficient approvals
+            Day 8 : Depositor calls refund
+                  : Funds returned
+                  : Contract closed
+
+    section Phase 5: Post-Resolution
+        Day 9+ : Transaction confirmed
+              : Balances updated
+              : Audit trail preserved
 ```
 
 ---
